@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+// In production (Vercel), use VITE_API_URL. In dev, use proxy '/api'
+const baseURL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
+  : '/api';
+
 const instance = axios.create({
-  baseURL: '/api',
+  baseURL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'

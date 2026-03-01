@@ -1,303 +1,169 @@
 import User from '../../models/User.js';
-import bcrypt from 'bcryptjs';
-import {generateOtp} from '../../utils/otpGenerator.js';
-import {sendEmail} from '../../utils/sendEmail.js';
-import crypto from 'crypto';
-import AppError from '../utils/appError.js';
+import generateCsv from '../../utils/generateCsv.js';
+import generatePdf from '../../utils/generatePdf.js';
+import mailSender from '../../utils/mailSender.js';
+import Product from '../../models/Product.js';
 
-const updateLoggedInUser = async (userId, updateData) => {
+import {
+  NotFoundError,
+  BadRequestError,
+  ForbiddenError
+} from '../../utils/appError.js';
 
-  const allowedFields = ['name','email','phone'];
 
-  const filteredData = {};
+/* ======================================
+   FETCH ALL USERS
+====================================== */
 
-  allowedFields.forEach(field=>{
-    if(updateData[field]){
-      filteredData[field] = updateData[field];
-    }
-  });
+const fetchAllUsers = async () => {
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    filteredData,
-    { new:true, runValidators:true }
-  ).select('-password');
+  const users = await User.find({
+    role: { $ne: 'admin' }
+  }).select('-password');
+
+  return users;
+};
+
+
+/* ======================================
+   FETCH SINGLE USER
+====================================== */
+
+const fetchUser = async (id) => {
+
+  const user = await User
+    .findById(id)
+    .select('-password');
 
   if (!user) {
-  throw new AppError('User not found', 404);
-}
-
+    throw new NotFoundError("User not found");
+  }
 
   return user;
 };
 
 
+/* ======================================
+   UPDATE USER
+====================================== */
 
+const updateUser = async (id, data) => {
 
-const changePassword = async (userId, oldPassword, newPassword) => {
+  delete data.role;
+  delete data.password;
 
-  const user = await User.findById(userId);
+  const user = await User.findByIdAndUpdate(
+    id,
+    data,
+    { new: true }
+  ).select('-password');
 
-   if (!user) {
-  throw new AppError('User not found', 404);
-}
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
 
-  const isMatch = await bcrypt.compare(oldPassword, user.password);
-
-  if (!isMatch) {
-  throw new AppError('Old password is incorrect', 400);
-}
-
-
-  
-  user.password = newPassword;
-
-  await user.save();
-
-  return true;
+  return user;
 };
 
 
+/* ======================================
+   DELETE USER
+====================================== */
 
+const deleteUser = async (id) => {
 
-
-const forgotPasswordWithMasterOtp = async (
-  email,
-  otp,
-  newPassword
-) => {
-
-  if (otp !== process.env.MASTER_OTP) {
-  throw new AppError('Invalid OTP', 400);
-}
-
-
-  const user = await User.findOne({ email });
+  const user = await User.findById(id);
 
   if (!user) {
-  throw new AppError('User not found', 404);
-}
+    throw new NotFoundError("User not found");
+  }
 
+  if (user.role === 'admin') {
+    throw new ForbiddenError("Cannot delete admin");
+  }
 
-  user.password = newPassword;
+  await user.deleteOne();
 
-  await user.save();
-
-  return true;
+  return { message: "User deleted successfully" };
 };
 
 
+/* ======================================
+   CREATE USER BY ADMIN
+====================================== */
 
-// const forgotPassword = async (email, schedule = {}) => {
-//   const user = await User.findOne({ email });
-//  if (!user) {
-//   throw new AppError('User not found', 404);
-// }
+const createUserByAdmin = async (data) => {
 
+  const { name, email, phone, password } = data;
 
-//   const { time, day, month } = schedule;
-
-//   if (time) {
-//     const [hours, minutes] = time.split(":");
-
-//     const now = new Date();
-
-    
-//     const scheduledDay = day ?? now.getDate();
-//     const scheduledMonth = month ?? now.getMonth() + 1; 
-
-//     const scheduledDate = new Date();
-//     scheduledDate.setFullYear(now.getFullYear());
-//     scheduledDate.setMonth(scheduledMonth - 1);
-//     scheduledDate.setDate(scheduledDay);
-//     scheduledDate.setHours(Number(hours));
-//     scheduledDate.setMinutes(Number(minutes));
-//     scheduledDate.setSeconds(0);
-//     scheduledDate.setMilliseconds(0);
-
-   
-//     if (scheduledDate <= now) {
-//   throw new AppError('Scheduled time must be in the future', 400);
-// }
-
-
-//     user.otpScheduleAt = scheduledDate;
-//     user.otpScheduled = true;
-
-//     await user.save();
-
-//     return;
-//   }
-
- 
-//   const otpData = generateOtp();
-
-//   user.otp = otpData.hashedOtp;
-//   user.otpExpires = otpData.expiresAt;
-//   user.otpRetryCount = 1;
-//   user.lastOtpSentAt = new Date();
-//   user.otpScheduled = false;
-//   user.otpScheduleAt = undefined;
-
-//   await user.save();
-
-//   const message = `Your password reset OTP is: ${otpData.otp}`;
-
-//   await sendEmail({
-//     email: user.email,
-//     subject: "Password Reset OTP",
-//     message,
-//   });
-// };
-
-
-
-// const resetPassword = async (email, otp, newPassword) => {
-//   const hashedInputOtp = crypto
-//     .createHash("sha256")
-//     .update(String(otp))
-//     .digest("hex");
-
-//   const user = await User.findOne({
-//     email,
-//     otp: hashedInputOtp,
-//     otpExpires: { $gt: Date.now() },
-//   });
-
-//  if (!user) {
-//   throw new AppError('Invalid or expired OTP', 400);
-// }
-
-
-
-  
-//   user.password = newPassword;
-//   user.otp = undefined;
-//   user.otpExpires = undefined;
-//   user.otpRetryCount = 0;
-//   user.lastOtpSentAt = undefined;
-
-//   await user.save();
-
-//   return true;
-// };
-
-
-// // c13491890a3afd5544b23b0ce15e0d25303f4a9a14a531433c2f2b0b46149082
-// // fb3e38322b8387b4f0ea370f28a057a568a50b05c6d4d75c6f64c8c2de075731
-// // fb3e38322b8387b4f0ea370f28a057a568a50b05c6d4d75c6f64c8c2de075731
-// //$2b$10$jMY1PjbUowIeF/NaCAHpFe5u5ftS9M4nOknoBtRjqOcfZ8VeLA3Oe
-// // $2b$10$pPalKfpiNLqtzsEl0GxbFuVMKxjcFSDubZ85nsRYAHfkn5kF5s5h6
-
-
-// const logoutUser = async (userId) => {
-//   const user = await User.findById(userId);
-
-//   if (!user) {
-//     throw new AppError('User not found', 404);
-//   }
-
-//   // Invalidate refresh token
-//   user.refreshToken = undefined;
-
-//   await user.save();
-
-//   return true;
-// };
-
-
-/* ==============================
-   ADDRESS SERVICES
-============================== */
-
-const addAddress = async (userId, addressData) => {
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new AppError('User not found', 404);
+  if (!name || !email || !password) {
+    throw new BadRequestError("Required fields missing");
   }
 
-  // If this address is default → unset previous defaults
-  if (addressData.isDefault) {
-    user.addresses.forEach(addr => addr.isDefault = false);
+  const exists = await User.findOne({ email });
+
+  if (exists) {
+    throw new BadRequestError("User already exists");
   }
 
-  user.addresses.push(addressData);
-
-  await user.save();
-
-  return user.addresses[user.addresses.length - 1];
-};
-
-
-const getMyAddresses = async (userId) => {
-
-  const user = await User.findById(userId).select('addresses');
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  return user.addresses;
-};
-
-
-const updateAddress = async (userId, addressId, updateData) => {
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  const address = user.addresses.id(addressId);
-
-  if (!address) {
-    throw new AppError('Address not found', 404);
-  }
-
-  // If updating default → unset others
-  if (updateData.isDefault) {
-    user.addresses.forEach(addr => addr.isDefault = false);
-  }
-
-  Object.keys(updateData).forEach(key => {
-    address[key] = updateData[key];
+  const user = await User.create({
+    name,
+    email,
+    phone,
+    password,
+    role: 'user'
   });
 
-  await user.save();
-
-  return address;
-};
-
-
-const deleteAddress = async (userId, addressId) => {
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  const address = user.addresses.id(addressId);
-
-  if (!address) {
-    throw new AppError('Address not found', 404);
-  }
-
-  address.deleteOne();
-
-  await user.save();
-
-  return true;
+  return {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role
+  };
 };
 
 
 
 
-export { updateLoggedInUser, changePassword, forgotPasswordWithMasterOtp, addAddress,
-  getMyAddresses,
-  updateAddress,
-  deleteAddress
- };
+
+
+/* ======================================
+   SEND USERS REPORT
+====================================== */
+
+const sendUsersReportService = async (adminId) => {
+
+  const admin = await User.findById(adminId);
+
+  if (!admin || admin.role !== "admin") {
+    throw new ForbiddenError("Unauthorized");
+  }
+
+  const users = await User.find({
+    role: { $ne: "admin" }
+  }).select("-password");
+
+  if (!users.length) {
+    throw new NotFoundError("No users found");
+  }
+
+  const csvBuffer = generateCsv(users);
+  const pdfBuffer = await generatePdf(users);
+
+  await mailSender(admin.email, csvBuffer, pdfBuffer);
+
+  return { message: "Users report sent to admin email" };
+};
+
+
+
+
+export {
+  fetchAllUsers,
+  fetchUser,
+  updateUser,
+  deleteUser,
+  createUserByAdmin,
+  sendUsersReportService
+};

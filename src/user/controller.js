@@ -1,135 +1,130 @@
-import asyncHandler from '../middleware/validate/asyncHandler.js';
-import {
-  updateLoggedInUser,
-  changePassword,
-  forgotPasswordWithMasterOtp,
-  addAddress,
-  getMyAddresses,
-  updateAddress,
-  deleteAddress
-} from './service.js';
+import * as adminService from './service.js';
+import asyncHandler from '../../middleware/asyncHandler.js';
 
-const updateMyProfile = asyncHandler(async (req, res) => {
-  const updatedUser = await updateLoggedInUser(
-    req.user._id,
-    req.body
+
+/* ======================================
+   GET ALL USERS
+====================================== */
+const getAllUsers = asyncHandler(async (req, res) => {
+
+  const users = await adminService.fetchAllUsers();
+
+  res.json({
+    success: true,
+    count: users.length,
+    data: users
+  });
+
+});
+
+
+/* ======================================
+   GET USER BY ID
+====================================== */
+const getUserById = asyncHandler(async (req, res) => {
+
+  const user = await adminService.fetchUser(
+    req.params.id
   );
 
-  res.status(200).json({
+  res.json({
     success: true,
-    data: updatedUser
+    data: user
   });
-});
 
-const changeMyPassword = asyncHandler(async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-
-  await changePassword(req.user._id, oldPassword, newPassword);
-
-  res.status(200).json({
-    success: true,
-    message: 'Password changed successfully'
-  });
-});
-
-const forgotPasswordMOtp = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-
-  await forgotPasswordWithMasterOtp(email, otp, newPassword);
-
-  res.status(200).json({
-    success: true,
-    message: 'Password reset successful'
-  });
-});
-
-// const forgotPasswordController = asyncHandler(async (req, res) => {
-//   const { email, time, day, month } = req.body;
-
-//   await forgotPassword(email, { time, day, month });
-
-//   res.status(200).json({
-//     success: true,
-//     message: "OTP request accepted",
-//   });
-// });
-
-// const resetPasswordController = asyncHandler(async (req, res) => {
-//   const { email, otp, newPassword } = req.body;
-
-//   await resetPassword(email, otp, newPassword);
-
-//   res.status(200).json({
-//     success: true,
-//     message: 'Password reset successful'
-//   });
-// });
-
-// const logoutController = asyncHandler(async (req, res) => {
-//   await logoutUser(req.user._id);
-
-//   res.status(200).json({
-//     success: true,
-//     message: 'Logged out successfully'
-//   });
-// });
-
-
-
-
-
-
-const addMyAddress = asyncHandler(async (req, res) => {
-  const address = await addAddress(req.user._id, req.body);
-
-  res.status(201).json({
-    success: true,
-    data: address
-  });
 });
 
 
-const getAddresses = asyncHandler(async (req, res) => {
-  const addresses = await getMyAddresses(req.user._id);
+/* ======================================
+   UPDATE USER
+====================================== */
+const updateUser = asyncHandler(async (req, res) => {
 
-  res.status(200).json({
-    success: true,
-    data: addresses
-  });
-});
-
-
-const updateMyAddress = asyncHandler(async (req, res) => {
-  const updatedAddress = await updateAddress(
-    req.user._id,
+  const updated = await adminService.updateUser(
     req.params.id,
     req.body
   );
 
-  res.status(200).json({
+  res.json({
     success: true,
-    data: updatedAddress
+    data: updated
   });
+
 });
 
 
-const deleteMyAddress = asyncHandler(async (req, res) => {
-  await deleteAddress(req.user._id, req.params.id);
+/* ======================================
+   DELETE USER
+====================================== */
+const deleteUser = asyncHandler(async (req, res) => {
+
+  const result = await adminService.deleteUser(
+    req.params.id
+  );
+
+  res.json({
+    success: true,
+    ...result
+  });
+
+});
+
+
+/* ======================================
+   CREATE USER
+====================================== */
+const createUser = asyncHandler(async (req, res) => {
+
+  const user = await adminService.createUserByAdmin(
+    req.body
+  );
+
+  res.status(201).json({
+    success: true,
+    data: user
+  });
+
+});
+
+
+const deleteProduct = asyncHandler(async (req, res) => {
+
+  const result = await adminService.deleteProduct(
+    req.params.id
+  );
+
+  res.json({
+    success: true,
+    ...result
+  });
+
+});
+
+
+/* ======================================
+   SEND USERS REPORT
+====================================== */
+const sendUsersReportController = asyncHandler(async (req, res) => {
+
+  const result =
+    await adminService.sendUsersReportService(
+      req.user._id
+    );
 
   res.status(200).json({
     success: true,
-    message: "Address deleted successfully"
+    ...result
   });
+
 });
 
 
 export {
-  updateMyProfile,
-  changeMyPassword,
-  forgotPasswordMOtp,
-  addMyAddress,
-  getAddresses,
-  updateMyAddress,
-  deleteMyAddress
+  getAllUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+  createUser,
+  deleteProduct,
+  sendUsersReportController
 };
-

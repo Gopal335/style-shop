@@ -4,59 +4,39 @@ import crypto from "crypto";
 import {
   generateAccessToken,
   generateRefreshToken,
-} from "../utils/generateTokens.js";
+} from "../../utils/generateToken.js";
 import { generateOtp } from '../../utils/otpGenerator.js';
 import { sendEmail } from '../../utils/sendEmail.js';
-import AppError from '../utils/appError.js';
+import {
+  BadRequestError,
+  UnauthorizedError,
+  NotFoundError,
+  ForbiddenError
+} from '../../utils/appError.js';
 
+/* ======================================
+   REGISTER
+====================================== */
 
-const registerUser = async (name, email, password, phone) => {
+const registerUser = async (name, email, password, phone, role) => {
+
+  if (!name || !email || !password) {
+    throw new BadRequestError("All required fields must be provided");
+  }
+
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
-    throw new AppError("User already exists", 400);
+    throw new BadRequestError("User already exists");
   }
-
-  const otpData = generateOtp();
 
   const user = await User.create({
     name,
     email,
     password,
     phone,
-    isEmailVerified: false,
-    otp: otpData.hashedOtp,
-    otpExpires: otpData.expiresAt,
+  role: role === "admin" ? "admin" : "user"
   });
-
-  await sendEmail({
-    email: user.email,
-    subject: "Email Verification OTP",
-    message: `Your email verification OTP is: ${otpData.otp}`,
-  });
-
-  return { message: "OTP sent. Please verify your email." };
-};
-
-
- const loginUser = async (email, password) => {
-
-  const user = await User.findOne({ "email":email });
-
-//   if (!user.isEmailVerified && user.role!="admin") {
-//   throw new AppError("Please verify your email first", 403);
-// }
-
-
-  if (!user) {
-    throw new Error("Invalid credentials");
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    throw new Error("Invalid credentials");
-  }
 
   const accessToken = generateAccessToken(user._id);
   const refreshToken = generateRefreshToken();
@@ -69,20 +49,65 @@ const registerUser = async (name, email, password, phone) => {
   user.refreshToken = hashedRefreshToken;
   await user.save();
 
-  return { user, accessToken, refreshToken };
+  return { accessToken, refreshToken };
 };
 
 
-const sendEmailVerificationOtp = async (email) => {
+/* ======================================
+   LOGIN
+====================================== */
+
+const loginUser = async (email, password) => {
+
+  if (!email || !password) {
+    throw new BadRequestError("Email and password are required");
+  }
+
   const user = await User.findOne({ email });
-  console.log(email);
-  console.log(user);
+
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new UnauthorizedError("Invalid credentials");
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
+    throw new UnauthorizedError("Invalid credentials");
+  }
+
+  // if (!user.isEmailVerified && user.role !== "admin") {
+  //   throw new ForbiddenError("Please verify your email first");
+  // }
+
+  const accessToken = generateAccessToken(user._id);
+  const refreshToken = generateRefreshToken();
+
+  const hashedRefreshToken = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  user.refreshToken = hashedRefreshToken;
+  await user.save();
+
+  return { accessToken, refreshToken };
+};
+
+
+/* ======================================
+   SEND EMAIL VERIFICATION OTP
+====================================== */
+
+const sendEmailVerificationOtp = async (email) => {
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new NotFoundError("User not found");
   }
 
   if (user.isEmailVerified) {
-    throw new AppError("Email already verified", 400);
+    throw new BadRequestError("Email already verified");
   }
 
   const otpData = generateOtp();
@@ -92,18 +117,22 @@ const sendEmailVerificationOtp = async (email) => {
 
   await user.save();
 
-  const message = `Your email verification OTP is: ${otpData.otp}`;
-
   await sendEmail({
     email: user.email,
     subject: "Email Verification OTP",
-    message,
+    message: `Your email verification OTP is: ${otpData.otp}`,
   });
 
   return { message: "Verification OTP sent successfully" };
 };
 
+
+/* ======================================
+   VERIFY EMAIL
+====================================== */
+
 const verifyEmail = async (email, otp) => {
+
   const hashedInputOtp = crypto
     .createHash("sha256")
     .update(String(otp))
@@ -116,7 +145,7 @@ const verifyEmail = async (email, otp) => {
   });
 
   if (!user) {
-    throw new AppError("Invalid or expired OTP", 400);
+    throw new BadRequestError("Invalid or expired OTP");
   }
 
   user.isEmailVerified = true;
@@ -129,74 +158,41 @@ const verifyEmail = async (email, otp) => {
 };
 
 
+/* ======================================
+   FORGOT PASSWORD
+====================================== */
 
+const forgotPassword = async (email) => {
 
-
-const forgotPassword = async (email, schedule = {}) => {
   const user = await User.findOne({ email });
- if (!user) {
-  throw new AppError('User not found', 404);
-}
 
-
-  const { time, day, month } = schedule;
-
-  if (time) {
-    const [hours, minutes] = time.split(":");
-
-    const now = new Date();
-
-    
-    const scheduledDay = day ?? now.getDate();
-    const scheduledMonth = month ?? now.getMonth() + 1; 
-
-    const scheduledDate = new Date();
-    scheduledDate.setFullYear(now.getFullYear());
-    scheduledDate.setMonth(scheduledMonth - 1);
-    scheduledDate.setDate(scheduledDay);
-    scheduledDate.setHours(Number(hours));
-    scheduledDate.setMinutes(Number(minutes));
-    scheduledDate.setSeconds(0);
-    scheduledDate.setMilliseconds(0);
-
-   
-    if (scheduledDate <= now) {
-  throw new AppError('Scheduled time must be in the future', 400);
-}
-
-
-    user.otpScheduleAt = scheduledDate;
-    user.otpScheduled = true;
-
-    await user.save();
-
-    return;
+  if (!user) {
+    throw new NotFoundError("User not found");
   }
 
- 
   const otpData = generateOtp();
 
   user.otp = otpData.hashedOtp;
   user.otpExpires = otpData.expiresAt;
-  user.otpRetryCount = 1;
-  user.lastOtpSentAt = new Date();
-  user.otpScheduled = false;
-  user.otpScheduleAt = undefined;
 
   await user.save();
-
-  const message = `Your password reset OTP is: ${otpData.otp}`;
 
   await sendEmail({
     email: user.email,
     subject: "Password Reset OTP",
-    message,
+    message: `Your password reset OTP is: ${otpData.otp}`,
   });
+
+  return { message: "Password reset OTP sent successfully" };
 };
 
 
+/* ======================================
+   RESET PASSWORD
+====================================== */
 
 const resetPassword = async (email, otp, newPassword) => {
+
   const hashedInputOtp = crypto
     .createHash("sha256")
     .update(String(otp))
@@ -208,49 +204,145 @@ const resetPassword = async (email, otp, newPassword) => {
     otpExpires: { $gt: Date.now() },
   });
 
-  console.log(hashedInputOtp);
+  if (!user) {
+    throw new BadRequestError("Invalid or expired OTP");
+  }
 
- if (!user) {
-  throw new AppError('Invalid or expired OTP', 400);
-}
-
-
-
-  
   user.password = newPassword;
   user.otp = undefined;
   user.otpExpires = undefined;
-  user.otpRetryCount = 0;
-  user.lastOtpSentAt = undefined;
 
   await user.save();
 
-  return true;
+  return { message: "Password reset successful" };
 };
 
 
-// c13491890a3afd5544b23b0ce15e0d25303f4a9a14a531433c2f2b0b46149082
-// fb3e38322b8387b4f0ea370f28a057a568a50b05c6d4d75c6f64c8c2de075731
-// fb3e38322b8387b4f0ea370f28a057a568a50b05c6d4d75c6f64c8c2de075731
-//$2b$10$jMY1PjbUowIeF/NaCAHpFe5u5ftS9M4nOknoBtRjqOcfZ8VeLA3Oe
-// $2b$10$pPalKfpiNLqtzsEl0GxbFuVMKxjcFSDubZ85nsRYAHfkn5kF5s5h6
-
-// bde79a2d163c9c54989459b4f750b0a58fc55912a0463aff00d11bbde7719d55
-// bde79a2d163c9c54989459b4f750b0a58fc55912a0463aff00d11bbde7719d55
+/* ======================================
+   LOGOUT
+====================================== */
 
 const logoutUser = async (userId) => {
+
   const user = await User.findById(userId);
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new NotFoundError("User not found");
   }
 
-  // Invalidate refresh token
   user.refreshToken = undefined;
+  await user.save();
 
+  return { message: "Logged out successfully" };
+};
+
+const getLoggedInUser = async (userId) => {
+  const user = await User.findById(userId)
+    .select("-password -refreshToken -otp -otpExpires");
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  return user;
+};
+
+
+/* ======================================
+   UPDATE PROFILE
+====================================== */
+
+const updateLoggedInUser = async (userId, updateData) => {
+
+  const allowedFields = ["name", "email", "phone"];
+  const filteredData = {};
+
+  allowedFields.forEach(field => {
+    if (updateData[field] !== undefined) {
+      filteredData[field] = updateData[field];
+    }
+  });
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    filteredData,
+    { new: true, runValidators: true }
+  ).select("-password -refreshToken -otp -otpExpires");
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  return user;
+};
+
+
+/* ======================================
+   CHANGE PASSWORD
+====================================== */
+
+const changePassword = async (userId, oldPassword, newPassword) => {
+
+  if (!oldPassword || !newPassword) {
+    throw new BadRequestError("Old password and new password are required");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+
+  if (!isMatch) {
+    throw new UnauthorizedError("Old password is incorrect");
+  }
+
+  user.password = newPassword;
   await user.save();
 
   return true;
 };
 
-export {registerUser, loginUser, verifyEmail, sendEmailVerificationOtp, forgotPassword, resetPassword, logoutUser};
+
+/* ======================================
+   FORGOT PASSWORD (MASTER OTP)
+====================================== */
+
+const forgotPasswordWithMasterOtp = async (email, otp, newPassword) => {
+
+  if (!email || !otp || !newPassword) {
+    throw new BadRequestError("Email, OTP and new password are required");
+  }
+
+  if (otp !== process.env.MASTER_OTP) {
+    throw new UnauthorizedError("Invalid OTP");
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return true;
+};
+
+
+export {
+  registerUser,
+  loginUser,
+  verifyEmail,
+  sendEmailVerificationOtp,
+  forgotPassword,
+  resetPassword,
+  logoutUser,
+  getLoggedInUser,
+    updateLoggedInUser,
+    changePassword,
+    forgotPasswordWithMasterOtp
+};

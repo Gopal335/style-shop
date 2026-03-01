@@ -10,6 +10,7 @@ import {
 
 import  protect from "../middleware/authMiddleware.js";
 import restrictTo from '../middleware/restrictTo.js';
+import upload from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -24,8 +25,9 @@ router.get('/:id', getSingleProduct);
   ADMIN ROUTES
 */
 
-router.post('/', protect, restrictTo('admin'), createProduct);
+router.post('/', protect, upload.array("images", 5), restrictTo('admin'), createProduct);
 router.put('/:id', protect, restrictTo('admin'), updateProduct);
 router.delete('/:id', protect, restrictTo('admin'), deleteProduct);
+
 
 export default router;

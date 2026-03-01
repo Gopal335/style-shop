@@ -1,8 +1,13 @@
 import Product from '../../models/Product.js';
-import AppError from '../utils/appError.js';
-
+import {
+  NotFoundError,
+  BadRequestError
+} from '../../utils/appError.js';
+import Image from '../../models/image.js';
+import Review from '../../models/review.model.js';
+import mongoose from "mongoose";
 /* ======================================
-   GET ALL PRODUCTS (Filter + Sort + Pagination)
+   GET ALL PRODUCTS
 ====================================== */
 
 export const getAllProductsService = async (queryParams) => {
@@ -10,102 +15,232 @@ export const getAllProductsService = async (queryParams) => {
     category,
     minPrice,
     maxPrice,
-    sort,
+    rating,
+    keyword,
+    sort = "-createdAt",
     page = 1,
     limit = 10,
-    keyword
   } = queryParams;
 
-  const filter = { isActive: true };
+  const matchStage = {};
 
-  if (category) {
-    filter.category = category;
-  }
+  if (category) matchStage.category = category;
 
   if (minPrice || maxPrice) {
-    filter.price = {};
-    if (minPrice) filter.price.$gte = Number(minPrice);
-    if (maxPrice) filter.price.$lte = Number(maxPrice);
+    matchStage.price = {};
+    if (minPrice) matchStage.price.$gte = Number(minPrice);
+    if (maxPrice) matchStage.price.$lte = Number(maxPrice);
   }
+
+  if (rating) matchStage.averageRating = { $gte: Number(rating) };
 
   if (keyword) {
-    filter.$text = { $search: keyword };
+    matchStage.$text = { $search: keyword };
   }
 
-  let sortOption = {};
+  const sortStage = {};
+  sort.split(",").forEach((field) => {
+    if (field.startsWith("-")) {
+      sortStage[field.substring(1)] = -1;
+    } else {
+      sortStage[field] = 1;
+    }
+  });
 
-  if (sort) {
-    const sortField = sort.startsWith('-') ? sort.substring(1) : sort;
-    sortOption[sortField] = sort.startsWith('-') ? -1 : 1;
-  } else {
-    sortOption.createdAt = -1;
-  }
+  const skip = (page - 1) * limit;
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const result = await Product.aggregate([
+    { $match: matchStage },
 
-  const products = await Product.find(filter)
-    .sort(sortOption)
-    .skip(skip)
-    .limit(Number(limit));
+    {
+      $lookup: {
+        from: "images",
+        localField: "images",
+        foreignField: "_id",
+        as: "images",
+      },
+    },
 
-  const total = await Product.countDocuments(filter);
+    {
+      $project: {
+        sold: 0,
+        numReviews: 0,
+      },
+    },
+
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $sort: sortStage },
+          { $skip: skip },
+          { $limit: Number(limit) },
+        ],
+      },
+    },
+  ]);
 
   return {
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / limit),
-    products
+    total: result[0].metadata[0]?.total || 0,
+    products: result[0].data,
   };
 };
 
 
 /* ======================================
-   GET SINGLE PRODUCT
+   GET PRODUCT BY ID
 ====================================== */
 
-export const getProductByIdService = async (id) => {
-  const product = await Product.findById(id);
 
-  if (!product || !product.isActive) {
-    throw new AppError('Product not found', 404);
+
+export const getProductByIdService = async (id) => {
+  const result = await Product.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+
+    // Images lookup
+    {
+      $lookup: {
+        from: "images",
+        localField: "images",
+        foreignField: "_id",
+        as: "images",
+      },
+    },
+
+    {
+      $addFields: {
+        images: {
+          $map: {
+            input: "$images",
+            as: "img",
+            in: { url: "$$img.url" },
+          },
+        },
+      },
+    },
+
+    // Reviews lookup (ONLY 1)
+    {
+      $lookup: {
+        from: "reviews",
+        let: { productId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$product", "$$productId"] },
+            },
+          },
+          { $sort: { createdAt: -1 } }, // latest first
+          { $limit: 1 },
+
+          {
+            $lookup: {
+              from: "users",
+              localField: "user",
+              foreignField: "_id",
+              as: "user",
+            },
+          },
+          { $unwind: "$user" },
+
+          {
+            $project: {
+              rating: 1,
+              comment: 1,
+              createdAt: 1,
+              "user.name": 1,
+            },
+          },
+        ],
+        as: "reviews",
+      },
+    },
+
+    {
+      $project: {
+        sold: 0,
+        isActive: 0,
+        ratings: 0,
+      },
+    },
+  ]);
+
+  if (!result.length) {
+    throw new NotFoundError("Product not found");
+  }
+
+  return result[0];
+};
+
+
+/* ======================================
+   CREATE PRODUCT
+====================================== */
+
+export const createProductService = async (adminId, data, files) => {
+
+  if (!data.name || !data.price) {
+    throw new BadRequestError("Name and price are required");
+  }
+
+  const product = await Product.create({
+    ...data,
+    createdBy: adminId,
+  });
+
+  if (files && files.length > 0) {
+
+    const imageDocs = await Promise.all(files.map(file =>
+        Image.create({
+          url: file.path,
+          public_id: file.filename,
+          product: product._id,
+          uploadedBy: adminId,
+        })
+      ));
+
+    product.images = imageDocs.map(img => img._id);
+    await product.save();
   }
 
   return product;
 };
 
 
-/* ======================================
-   CREATE PRODUCT (Admin)
-====================================== */
-
-export const createProductService = async (adminId, data) => {
-  const product = await Product.create({
-    ...data,
-    createdBy: adminId
-  });
-
-  return product;
-};
-
 
 /* ======================================
-   UPDATE PRODUCT (Admin)
+   UPDATE PRODUCT
 ====================================== */
 
 export const updateProductService = async (id, updateData) => {
-  const product = await Product.findById(id);
 
-  if (!product) {
-    throw new AppError('Product not found', 404);
+  if (updateData.price || updateData.discountPercentage) {
+
+    const product = await Product.findById(id);
+
+    if (!product) {
+      throw new NotFoundError("Product not found");
+    }
+
+    const price = updateData.price ?? product.price;
+    const discountPercentage =
+      updateData.discountPercentage ?? product.discountPercentage;
+
+    updateData.discountPrice =
+      price - (price * discountPercentage) / 100;
   }
 
-  Object.keys(updateData).forEach((key) => {
-    product[key] = updateData[key];
-  });
+  const updatedProduct = await Product.findByIdAndUpdate(
+    id,
+    updateData,
+    { new: true, runValidators: true }
+  );
 
-  await product.save();
-
-  return product;
+  return updatedProduct;
 };
 
 
@@ -114,14 +249,17 @@ export const updateProductService = async (id, updateData) => {
 ====================================== */
 
 export const deleteProductService = async (id) => {
+
   const product = await Product.findById(id);
 
   if (!product) {
-    throw new AppError('Product not found', 404);
+    throw new NotFoundError("Product not found");
   }
 
-  product.isActive = false;
-  await product.save();
+  
+  await product.deleteOne();
 
   return true;
 };
+
+
