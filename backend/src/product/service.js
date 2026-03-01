@@ -2,7 +2,7 @@ import Product from '../../models/Product.js';
 import {
   NotFoundError,
   BadRequestError
-} from '../../utils/appError.js';
+} from '../../utils/errors.js';
 import Image from '../../models/image.js';
 import Review from '../../models/review.model.js';
 import mongoose from "mongoose";

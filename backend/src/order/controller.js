@@ -6,7 +6,7 @@ import {
   updateOrderStatusService
 } from './service.js';
 
-import { BadRequestError } from '../../utils/appError.js';
+import { BadRequestError } from '../../utils/errors.js';
 import asyncHandler from '../../middleware/asyncHandler.js';
 
 

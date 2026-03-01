@@ -3,7 +3,7 @@ import Product from '../../models/Product.js';
 import {
   NotFoundError,
   BadRequestError
-} from '../../utils/appError.js';
+} from '../../utils/errors.js';
 import mongoose from 'mongoose';
 
 /* ======================================

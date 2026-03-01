@@ -7,7 +7,7 @@ import {
   BadRequestError,
   NotFoundError,
   ForbiddenError
-} from '../../utils/appError.js';
+} from '../../utils/errors.js';
 
 /* ======================================
    CREATE ORDER

@@ -1,5 +1,5 @@
 import Address from '../../models/address.model.js';
-import { NotFoundError } from '../../utils/appError.js';
+import { NotFoundError } from '../../utils/errors.js';
 
 /* ======================================
    ADD ADDRESS
