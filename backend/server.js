@@ -14,11 +14,20 @@ connectDB();
 
 const app = express();
 
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean)
+  : [];
+const corsOrigins = [
+  'http://localhost:5003',
+  'http://localhost:5174',
+  'http://localhost:5173',
+  ...allowedOrigins
+];
 app.use(cors({
-  origin: ["http://localhost:5003", "http://localhost:5174", "http://localhost:5173"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: corsOrigins.length ? corsOrigins : true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
-}))
+}));
 
 app.use(express.json());
 
