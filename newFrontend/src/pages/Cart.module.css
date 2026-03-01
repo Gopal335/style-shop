@@ -1,0 +1,313 @@
+.wrapper {
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.backBtn:hover {
+  text-decoration: underline;
+}
+
+.title {
+  font-size: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.loading,
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  gap: 1rem;
+  color: var(--color-text-muted);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.shopBtn {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 2rem;
+}
+
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.itemsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cartItem {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.itemImage {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.itemImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imgPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.itemDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+}
+
+.itemName:hover {
+  color: var(--color-accent);
+}
+
+.itemPrice {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.quantityCtrl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.quantityCtrl button {
+  width: 32px;
+  height: 32px;
+  background: var(--color-surface-elevated);
+  border: none;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.quantityCtrl button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quantityCtrl span {
+  min-width: 28px;
+  text-align: center;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--color-error);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  text-decoration: underline;
+}
+
+.itemTotal {
+  font-weight: 600;
+  font-size: 1.1rem;
+  align-self: center;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.summary,
+.addressSection {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.summary h3,
+.addressSection h3 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.summary p {
+  margin-bottom: 0.5rem;
+}
+
+.total {
+  font-size: 1.2rem;
+  margin-top: 0.75rem !important;
+}
+
+.addressList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.addressOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.noAddress {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.addAddrBtn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.addAddrBtn:hover {
+  border-color: var(--color-accent);
+}
+
+.addressForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.addressForm input,
+.addressForm select {
+  padding: 0.6rem 1rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.formActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.formActions button {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.formActions button[type="submit"] {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+}
+
+.cancelBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.orderError {
+  color: var(--color-error);
+  font-size: 0.9rem;
+}
+
+.placeOrderBtn {
+  padding: 1rem 1.5rem;
+  background: var(--color-success);
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.placeOrderBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.placeOrderBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
